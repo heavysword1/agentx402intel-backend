@@ -16,6 +16,8 @@
       --text: #e5e5e5;
       --muted: #666666;
       --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
       --blue: #3b82f6;
       --font: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
     }
@@ -228,84 +230,74 @@
     td.dim { color: var(--muted); }
     td.price { color: var(--green); font-size: 11px; }
 
-    /* ── Portfolio Table ── */
-    .portfolio-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
-    }
-    .portfolio-card {
+    /* ── Demand Signals ── */
+    .demand-hero {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 18px;
+      padding: 20px 24px;
       display: flex;
-      flex-direction: column;
-      gap: 10px;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
     }
-    .portfolio-card .svc-name {
-      font-size: 13px;
+    .demand-hero .big-num {
+      font-size: 48px;
       font-weight: 700;
       color: var(--orange);
+      line-height: 1;
     }
-    .portfolio-card .kv {
+    .demand-hero .big-label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .demand-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    /* demand heat colors */
+    .heat-red  { color: var(--red);    font-weight: 700; }
+    .heat-orange { color: var(--orange); font-weight: 700; }
+    .heat-yellow { color: var(--yellow); }
+    .heat-dim  { color: var(--muted); }
+
+    /* ── Market Analytics ── */
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .analytics-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .analytics-card .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .analytics-card .kv {
       display: flex;
       justify-content: space-between;
-      font-size: 11px;
-    }
-    .portfolio-card .kv .k { color: var(--muted); }
-    .portfolio-card .kv .v { color: var(--text); }
-
-    /* ── Demand Signals ── */
-    .demand-list {
-      display: flex;
-      flex-direction: column;
+      align-items: baseline;
+      font-size: 12px;
       gap: 8px;
     }
-    .demand-row {
-      display: grid;
-      grid-template-columns: 1fr 48px;
-      align-items: center;
-      gap: 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px 14px;
-    }
-    .demand-ep {
-      font-size: 12px;
-      color: var(--text);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .demand-n {
-      text-align: right;
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--orange);
-    }
-
-    /* ── Recent Txs ── */
-    .tx-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .tx-row {
-      display: grid;
-      grid-template-columns: 80px 1fr 100px;
-      align-items: center;
-      gap: 12px;
-      padding: 9px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 12px;
-    }
-    .tx-amount { color: var(--green); font-weight: 700; }
-    .tx-from { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tx-date { color: var(--muted); text-align: right; }
+    .analytics-card .kv .k { color: var(--muted); }
+    .analytics-card .kv .v { color: var(--text); font-weight: 600; }
+    .analytics-card .kv .v.green { color: var(--green); }
+    .analytics-card .kv .v.orange { color: var(--orange); }
 
     /* ── Loading / error ── */
     .loading {
@@ -357,19 +349,19 @@
         <div class="sub" id="stat-fetched"></div>
       </div>
       <div class="stat-card">
-        <div class="label">Our Portfolio Revenue</div>
-        <div class="value" id="stat-usdc">—</div>
-        <div class="sub">USDC on Base</div>
+        <div class="label">Unique Categories</div>
+        <div class="value" id="stat-categories">—</div>
+        <div class="sub">service types in ecosystem</div>
       </div>
       <div class="stat-card">
-        <div class="label">Confirmed On-Chain Tx</div>
-        <div class="value" id="stat-tx">—</div>
-        <div class="sub" id="stat-payers"></div>
+        <div class="label">Median Price / Call</div>
+        <div class="value" id="stat-median">—</div>
+        <div class="sub" id="stat-price-range"></div>
       </div>
       <div class="stat-card">
-        <div class="label">Paid API Calls</div>
-        <div class="value" id="stat-calls">—</div>
-        <div class="sub" id="stat-callers"></div>
+        <div class="label">Ecosystem Probes (24h)</div>
+        <div class="value" id="stat-probes">—</div>
+        <div class="sub" id="stat-probers"></div>
       </div>
     </div>
   </section>
@@ -407,25 +399,78 @@
     </div>
   </section>
 
-  <!-- Section 4: Our x402 Portfolio -->
+  <!-- Section 4: Demand Signals -->
   <section>
-    <div class="section-title">Our x402 Portfolio</div>
-    <div class="portfolio-grid" id="portfolio-grid">
-      <div class="loading">Loading portfolio…</div>
-    </div>
-    <div style="margin-top:8px">
-      <div class="section-title" style="font-size:10px;margin-bottom:12px">Recent On-Chain Transactions</div>
-      <div class="tx-list" id="tx-list">
-        <div class="loading">Loading transactions…</div>
+    <div class="section-title">Demand Signals — What Agents Are Exploring</div>
+    <div class="demand-hero">
+      <div>
+        <div class="big-num" id="demand-total">—</div>
+        <div class="big-label">probes in last 24h</div>
       </div>
+      <div style="width:1px;height:48px;background:var(--border)"></div>
+      <div>
+        <div class="big-num" id="demand-probers" style="font-size:32px">—</div>
+        <div class="big-label">unique agents exploring</div>
+      </div>
+      <div style="margin-left:auto;color:var(--muted);font-size:11px;max-width:240px;line-height:1.6">
+        402 responses = agent exploration before committing to buy. High probe count = strong demand signal.
+      </div>
+    </div>
+    <div class="demand-table-wrap">
+      <table id="demand-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Endpoint</th>
+            <th>Probe Count</th>
+            <th>Service</th>
+          </tr>
+        </thead>
+        <tbody id="demand-tbody">
+          <tr><td colspan="4" class="loading">Loading demand signals…</td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
-  <!-- Section 5: Demand Signals -->
+  <!-- Section 5: Market Analytics -->
   <section>
-    <div class="section-title">Demand Signals — Top Probed Endpoints</div>
-    <div class="demand-list" id="demand-list">
-      <div class="loading">Loading demand signals…</div>
+    <div class="section-title">Market Analytics</div>
+    <div class="analytics-grid">
+      <div class="analytics-card">
+        <div class="card-title">Price Distribution</div>
+        <div class="kv">
+          <span class="k">Cheapest per call</span>
+          <span class="v green" id="analytics-min">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Median per call</span>
+          <span class="v orange" id="analytics-median">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Most expensive</span>
+          <span class="v" id="analytics-max">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Priced endpoints</span>
+          <span class="v" id="analytics-count">—</span>
+        </div>
+      </div>
+      <div class="analytics-card">
+        <div class="card-title">Service Depth</div>
+        <div class="kv">
+          <span class="k">Single-endpoint services</span>
+          <span class="v" id="analytics-single">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Services with 5+ endpoints</span>
+          <span class="v orange" id="analytics-rich">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Avg endpoints per service</span>
+          <span class="v" id="analytics-avg">—</span>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -441,6 +486,13 @@
   function fmt(n, decimals = 2) {
     if (n == null || isNaN(n)) return '—';
     return parseFloat(n).toFixed(decimals);
+  }
+
+  function heatClass(n) {
+    if (n > 200) return 'heat-red';
+    if (n > 50)  return 'heat-orange';
+    if (n > 10)  return 'heat-yellow';
+    return 'heat-dim';
   }
 
   function renderCategories(byCategory) {
@@ -491,70 +543,50 @@
     );
   }
 
-  function renderPortfolio(portfolio, onchain) {
-    const grid = document.getElementById('portfolio-grid');
-    if (!portfolio) { grid.innerHTML = '<div class="loading err">Portfolio data unavailable</div>'; return; }
-
-    const cards = [
-      {
-        name: 'memoryapi.org',
-        desc: 'Persistent AI Memory API',
-        paid_calls: portfolio.paid_calls,
-        callers: portfolio.unique_payers,
-        revenue: onchain?.total_usdc
-      }
-    ];
-
-    grid.innerHTML = cards.map(c => `
-      <div class="portfolio-card">
-        <div class="svc-name">${c.name}</div>
-        <div class="kv"><span class="k">Description</span><span class="v">${c.desc}</span></div>
-        <div class="kv"><span class="k">Paid Calls (logs)</span><span class="v">${c.paid_calls ?? '—'}</span></div>
-        <div class="kv"><span class="k">Unique Callers</span><span class="v">${c.callers ?? '—'}</span></div>
-        <div class="kv"><span class="k">On-Chain Revenue</span><span class="v" style="color:var(--green)">$${fmt(c.revenue)} USDC</span></div>
-      </div>
-    `).join('');
-
-    // top endpoints
-    if (portfolio.top_endpoints && portfolio.top_endpoints.length) {
-      grid.innerHTML += `
-        <div class="portfolio-card" style="grid-column: 1 / -1">
-          <div class="svc-name">Top Paid Endpoints</div>
-          ${portfolio.top_endpoints.map(({ep,n}) => `
-            <div class="kv"><span class="k" style="font-size:11px">${ep}</span><span class="v">${n} calls</span></div>
-          `).join('')}
-        </div>
-      `;
-    }
-  }
-
-  function renderTxList(recent) {
-    const el = document.getElementById('tx-list');
-    if (!recent || !recent.length) {
-      el.innerHTML = '<div class="loading">No recent transactions</div>';
+  function renderDemandSignals(demand) {
+    const tbody = document.getElementById('demand-tbody');
+    if (!demand || demand.error) {
+      tbody.innerHTML = `<tr><td colspan="4" class="err">${demand?.error || 'No demand data'}</td></tr>`;
       return;
     }
-    el.innerHTML = recent.map(t => `
-      <div class="tx-row">
-        <div class="tx-amount">+$${fmt(t.amount, 4)}</div>
-        <div class="tx-from">${t.from || '—'}</div>
-        <div class="tx-date">${t.date || '—'}</div>
-      </div>
-    `).join('');
-  }
 
-  function renderDemandSignals(signals) {
-    const el = document.getElementById('demand-list');
-    if (!signals || !signals.length) {
-      el.innerHTML = '<div class="loading">No demand signal data</div>';
+    document.getElementById('demand-total').textContent = (demand.total_probes_24h || 0).toLocaleString();
+    document.getElementById('demand-probers').textContent = (demand.unique_probers || 0).toLocaleString();
+    document.getElementById('stat-probes').textContent = (demand.total_probes_24h || 0).toLocaleString();
+    document.getElementById('stat-probers').textContent = `from ${demand.unique_probers || 0} unique agents`;
+
+    const endpoints = demand.top_endpoints || [];
+    if (!endpoints.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="loading">No probe data yet</td></tr>';
       return;
     }
-    el.innerHTML = signals.map(({ep, n}) => `
-      <div class="demand-row">
-        <div class="demand-ep">${ep}</div>
-        <div class="demand-n">${n}</div>
-      </div>
-    `).join('');
+
+    tbody.innerHTML = endpoints.map(({ep, n}, i) => {
+      const parts = ep.split('/');
+      const service = parts[2] || '—';
+      return `<tr>
+        <td class="dim">${i + 1}</td>
+        <td style="font-family:var(--font);font-size:11px;color:var(--text)">${ep}</td>
+        <td class="${heatClass(n)}">${n.toLocaleString()}</td>
+        <td class="cat-cell">${service}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderMarketAnalytics(market) {
+    if (!market || market.error) return;
+
+    const ps = market.price_stats || {};
+    const ss = market.service_stats || {};
+
+    if (ps.min != null)    document.getElementById('analytics-min').textContent    = `$${fmt(ps.min, 4)}`;
+    if (ps.median != null) document.getElementById('analytics-median').textContent = `$${fmt(ps.median, 4)}`;
+    if (ps.max != null)    document.getElementById('analytics-max').textContent    = `$${fmt(ps.max, 4)}`;
+    if (ps.count != null)  document.getElementById('analytics-count').textContent  = ps.count.toLocaleString();
+
+    if (ss.single_endpoint != null) document.getElementById('analytics-single').textContent = ss.single_endpoint.toLocaleString();
+    if (ss.rich_5plus != null)      document.getElementById('analytics-rich').textContent    = ss.rich_5plus.toLocaleString();
+    if (ss.avg_endpoints != null)   document.getElementById('analytics-avg').textContent     = ss.avg_endpoints;
   }
 
   async function loadData() {
@@ -567,13 +599,23 @@
       document.getElementById('last-updated').textContent =
         d.generated_at ? 'Updated: ' + new Date(d.generated_at).toLocaleTimeString() : '';
 
-      // Stats
+      // Market stats + categories + service table
       if (d.market && !d.market.error) {
         document.getElementById('stat-total').textContent = d.market.total?.toLocaleString() || '—';
         document.getElementById('stat-fetched').textContent = `${d.market.fetched} loaded`;
+        document.getElementById('stat-categories').textContent = (d.market.by_category || []).length;
+
+        const ps = d.market.price_stats;
+        if (ps) {
+          document.getElementById('stat-median').textContent = ps.median ? `$${fmt(ps.median, 4)}` : '—';
+          document.getElementById('stat-price-range').textContent =
+            ps.min && ps.max ? `$${fmt(ps.min,4)} – $${fmt(ps.max,4)} range` : '';
+        }
+
         renderCategories(d.market.by_category);
         allServices = d.market.services || [];
         renderServices(allServices);
+        renderMarketAnalytics(d.market);
       } else {
         const errMsg = d.market?.error || 'Unavailable';
         document.getElementById('stat-total').textContent = '—';
@@ -581,30 +623,8 @@
         document.getElementById('svc-tbody').innerHTML = `<tr><td colspan="5" class="err">Error: ${errMsg}</td></tr>`;
       }
 
-      if (d.onchain && !d.onchain.error) {
-        document.getElementById('stat-usdc').textContent = '$' + fmt(d.onchain.total_usdc);
-        document.getElementById('stat-tx').textContent = d.onchain.tx_count ?? '—';
-        document.getElementById('stat-payers').textContent = `${d.onchain.unique_payers} unique payers`;
-        renderTxList(d.onchain.recent);
-      } else {
-        document.getElementById('stat-usdc').textContent = '—';
-        document.getElementById('stat-tx').textContent = '—';
-        if (d.onchain?.error) {
-          document.getElementById('tx-list').innerHTML = `<div class="err">On-chain error: ${d.onchain.error}</div>`;
-        }
-      }
-
-      if (d.portfolio && !d.portfolio.error) {
-        document.getElementById('stat-calls').textContent = d.portfolio.paid_calls ?? '—';
-        document.getElementById('stat-callers').textContent = `${d.portfolio.unique_payers} unique IPs`;
-        renderPortfolio(d.portfolio, d.onchain);
-        renderDemandSignals(d.portfolio.demand_signals);
-      } else {
-        document.getElementById('stat-calls').textContent = '—';
-        if (d.portfolio?.error) {
-          document.getElementById('demand-list').innerHTML = `<div class="err">Log error: ${d.portfolio.error}</div>`;
-        }
-      }
+      // Demand signals
+      renderDemandSignals(d.demand);
 
     } catch (e) {
       console.error('Data load failed:', e);

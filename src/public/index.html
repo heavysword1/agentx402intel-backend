@@ -212,6 +212,21 @@
       border-bottom: 1px solid var(--border);
       white-space: nowrap;
     }
+    thead th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th.sortable:hover {
+      color: var(--text);
+    }
+    thead th.sort-active {
+      color: var(--orange);
+    }
+    .sort-arrow {
+      display: inline-block;
+      margin-left: 4px;
+      font-size: 9px;
+    }
     tbody tr {
       border-bottom: 1px solid #161616;
       transition: background 0.15s;
@@ -385,15 +400,17 @@
       <table id="svc-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Category</th>
-            <th>Endpoints</th>
-            <th>Networks</th>
-            <th>Price Range (USDC)</th>
+            <th class="sortable" data-key="name">Name <span class="sort-arrow" id="arrow-name"></span></th>
+            <th class="sortable" data-key="category">Category <span class="sort-arrow" id="arrow-category"></span></th>
+            <th class="sortable" data-key="total_usdc">Total USDC <span class="sort-arrow" id="arrow-total_usdc">▼</span></th>
+            <th class="sortable" data-key="tx_count">Tx Count <span class="sort-arrow" id="arrow-tx_count"></span></th>
+            <th class="sortable" data-key="last_active">Last Active <span class="sort-arrow" id="arrow-last_active"></span></th>
+            <th class="sortable" data-key="endpoints">Endpoints <span class="sort-arrow" id="arrow-endpoints"></span></th>
+            <th class="sortable" data-key="price_min">Price <span class="sort-arrow" id="arrow-price_min"></span></th>
           </tr>
         </thead>
         <tbody id="svc-tbody">
-          <tr><td colspan="5" class="loading">Loading services…</td></tr>
+          <tr><td colspan="7" class="loading">Loading services…</td></tr>
         </tbody>
       </table>
     </div>
@@ -482,6 +499,8 @@
 
 <script>
   let allServices = [];
+  let sortKey = 'total_usdc';
+  let sortDir = -1; // -1 = desc, 1 = asc
 
   function fmt(n, decimals = 2) {
     if (n == null || isNaN(n)) return '—';
@@ -510,36 +529,74 @@
     `).join('');
   }
 
+  function sortServices(services) {
+    return [...services].sort((a, b) => {
+      let av = a[sortKey], bv = b[sortKey];
+      // treat null/undefined as empty string for strings, 0 for numbers
+      if (sortKey === 'name' || sortKey === 'category' || sortKey === 'last_active') {
+        av = av || '';
+        bv = bv || '';
+        return sortDir * av.localeCompare(bv);
+      }
+      av = av || 0;
+      bv = bv || 0;
+      return sortDir * (bv - av);
+    });
+  }
+
+  function updateSortHeaders() {
+    document.querySelectorAll('#svc-table thead th.sortable').forEach(th => {
+      const key = th.dataset.key;
+      const arrow = document.getElementById('arrow-' + key);
+      if (key === sortKey) {
+        th.classList.add('sort-active');
+        if (arrow) arrow.textContent = sortDir === -1 ? '▼' : '▲';
+      } else {
+        th.classList.remove('sort-active');
+        if (arrow) arrow.textContent = '';
+      }
+    });
+  }
+
   function renderServices(services) {
     const tbody = document.getElementById('svc-tbody');
     if (!services || !services.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="loading">No services</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="loading">No services</td></tr>';
       document.getElementById('svc-count').textContent = '';
       return;
     }
-    document.getElementById('svc-count').textContent = `${services.length} services`;
-    tbody.innerHTML = services.map(s => {
+    const sorted = sortServices(services);
+    document.getElementById('svc-count').textContent = `${sorted.length} services`;
+    tbody.innerHTML = sorted.map(s => {
+      const usdcVal = s.total_usdc || 0;
+      const usdcColor = usdcVal > 0 ? 'var(--green)' : 'var(--muted)';
+      const usdcStr = usdcVal > 0 ? `$${fmt(usdcVal, 2)}` : '—';
+      const txCount = s.tx_count != null ? s.tx_count.toLocaleString() : '—';
+      const lastActive = s.last_active
+        ? new Date(s.last_active).toLocaleDateString()
+        : '—';
       const priceStr = s.price_min != null
-        ? (s.price_min === s.price_max ? `$${fmt(s.price_min,4)}` : `$${fmt(s.price_min,4)} – $${fmt(s.price_max,4)}`)
+        ? `$${fmt(s.price_min, 4)}`
         : '—';
       const domain = s.domain ? `<span style="color:var(--muted);font-size:10px"> · ${s.domain}</span>` : '';
       return `<tr>
         <td>${s.name || '—'}${domain}</td>
-        <td class="cat-cell">${s.category}</td>
-        <td class="dim">${s.endpoints}</td>
-        <td class="dim" style="font-size:11px">${s.networks || '—'}</td>
+        <td class="cat-cell">${s.category || '—'}</td>
+        <td style="color:${usdcColor};font-size:12px">${usdcStr}</td>
+        <td class="dim">${txCount}</td>
+        <td class="dim" style="font-size:11px">${lastActive}</td>
+        <td class="dim">${s.endpoints != null ? s.endpoints : '—'}</td>
         <td class="price">${priceStr}</td>
       </tr>`;
     }).join('');
   }
 
   function filterServices(query) {
-    const q = query.toLowerCase().trim();
+    const q = (query || '').toLowerCase().trim();
     if (!q) return allServices;
     return allServices.filter(s =>
       (s.name||'').toLowerCase().includes(q) ||
-      (s.category||'').toLowerCase().includes(q) ||
-      (s.domain||'').toLowerCase().includes(q)
+      (s.category||'').toLowerCase().includes(q)
     );
   }
 
@@ -632,10 +689,28 @@
     }
   }
 
+  // Sortable column headers
+  document.querySelectorAll('#svc-table thead th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (sortKey === key) {
+        sortDir *= -1;
+      } else {
+        sortKey = key;
+        sortDir = -1;
+      }
+      updateSortHeaders();
+      renderServices(filterServices(document.getElementById('svc-search').value));
+    });
+  });
+
   // Search
   document.getElementById('svc-search').addEventListener('input', e => {
     renderServices(filterServices(e.target.value));
   });
+
+  // Init sort indicators
+  updateSortHeaders();
 
   // Initial load + auto-refresh
   loadData();

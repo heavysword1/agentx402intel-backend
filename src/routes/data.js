@@ -63,41 +63,56 @@ router.get('/market-data', async (req, res) => {
     };
   } catch(e) { result.market = { error: e.message }; }
 
-  // 2. Demand signals from nginx probes (what the market is exploring — no private data)
+  // 2. Market-wide demand signals from on-chain activity
   try {
-    const fs = require('fs');
-    const lines = [];
-    try { lines.push(...fs.readFileSync('/var/log/nginx/access.log','utf8').split('\n')); } catch(e){}
-    try { lines.push(...fs.readFileSync('/var/log/nginx/access.log.1','utf8').split('\n')); } catch(e){}
+    const sevenDaysAgo = new Date(Date.now() - 7*86400000).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30*86400000).toISOString();
+    
+    // Trending: active in last 7 days
+    const { data: trending7 } = await supabase.from('x402_wallets')
+      .select('service_name, service_category, total_usdc_received, tx_count, latest_tx_date, domain')
+      .gte('latest_tx_date', sevenDaysAgo)
+      .order('total_usdc_received', { ascending: false }).limit(50);
 
-    // 402 probes = demand signal (agents exploring before buying)
-    const probes = lines.filter(l =>
-      (l.includes('GET /x402') || l.includes('POST /x402')) && l.includes(' 402 ') &&
-      !l.includes('bazaar-settle') && !l.includes('settle-memory')
-    );
+    // Active last 30 days
+    const { data: trending30 } = await supabase.from('x402_wallets')
+      .select('service_name, service_category, total_usdc_received, tx_count, latest_tx_date')
+      .gte('latest_tx_date', thirtyDaysAgo)
+      .lt('latest_tx_date', sevenDaysAgo)
+      .order('total_usdc_received', { ascending: false }).limit(30);
 
-    const probeCounts = {};
-    const proberIPs = new Set();
-    probes.forEach(l => {
-      const m = l.match(/"(?:GET|POST) (\/x402[^\s?]+)/);
-      const ip = l.split(' ')[0];
-      if (m) probeCounts[m[1]] = (probeCounts[m[1]] || 0) + 1;
-      if (ip && ip !== '-') proberIPs.add(ip);
-    });
+    // Deduplicate by service name
+    const dedupe = (rows) => {
+      const seen = new Set();
+      return (rows||[]).filter(r => !seen.has(r.service_name) && seen.add(r.service_name));
+    };
 
-    // Category-level demand
-    const catDemand = {};
-    Object.entries(probeCounts).forEach(([ep, count]) => {
-      const parts = ep.split('/');
-      const service = parts[2] || 'unknown';
-      catDemand[service] = (catDemand[service] || 0) + count;
+    const hot = dedupe(trending7);
+    const warm = dedupe(trending30);
+
+    // Category breakdown of active services
+    const catActivity = {};
+    [...(trending7||[]), ...(trending30||[])].forEach(r => {
+      const c = r.service_category || 'Other';
+      catActivity[c] = (catActivity[c] || 0) + (r.total_usdc_received || 0);
     });
 
     result.demand = {
-      total_probes_24h: probes.length,
-      unique_probers: proberIPs.size,
-      top_endpoints: Object.entries(probeCounts).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([ep,n])=>({ep,n})),
-      by_service: Object.entries(catDemand).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([svc,n])=>({svc,n}))
+      source: 'on-chain Base mainnet USDC transactions',
+      hot_7d: hot.slice(0,12).map(r => ({
+        service: r.service_name, category: r.service_category,
+        usdc_7d: Math.round(r.total_usdc_received*100)/100,
+        tx_count: r.tx_count, last_active: r.latest_tx_date?.substring(0,10),
+        domain: r.domain
+      })),
+      warm_30d: warm.slice(0,8).map(r => ({
+        service: r.service_name, category: r.service_category,
+        usdc: Math.round(r.total_usdc_received*100)/100,
+        last_active: r.latest_tx_date?.substring(0,10)
+      })),
+      active_services_7d: hot.length,
+      active_services_30d: hot.length + warm.length,
+      by_category: Object.entries(catActivity).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([cat,usdc])=>({cat, usdc: Math.round(usdc*100)/100}))
     };
   } catch(e) { result.demand = { error: e.message }; }
 

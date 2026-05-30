@@ -1,3 +1,6 @@
+const { createClient } = require('@supabase/supabase-js');
+if(!process.env.SUPABASE_URL) require('dotenv').config({ path: require('path').join(__dirname,'../../.env') });
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const express = require('express');
 const axios = require('axios');
 const NodeCache = require('node-cache');
@@ -98,6 +101,37 @@ router.get('/market-data', async (req, res) => {
     };
   } catch(e) { result.demand = { error: e.message }; }
 
+  // 3. Volume leaderboard from scraped + indexed wallets
+  try {
+    const { data: leaders } = await supabase
+      .from('x402_wallets')
+      .select('service_name, service_category, domain, pay_to, total_usdc_received, tx_count')
+      .gt('tx_count', 0)
+      .order('total_usdc_received', { ascending: false })
+      .limit(100);
+
+    const walletMap = {};
+    (leaders || []).forEach(r => {
+      const key = r.pay_to;
+      if (!walletMap[key]) walletMap[key] = { service: r.service_name, category: r.service_category, domain: r.domain, usdc: r.total_usdc_received || 0, txs: r.tx_count || 0 };
+      else { walletMap[key].usdc = Math.max(walletMap[key].usdc, r.total_usdc_received||0); walletMap[key].txs = Math.max(walletMap[key].txs, r.tx_count||0); }
+    });
+
+    result.leaderboard = Object.values(walletMap).sort((a,b) => b.usdc - a.usdc).slice(0,20).map((r,i) => ({ rank:i+1, service:r.service, category:r.category, domain:r.domain, total_usdc:Math.round(r.usdc*100)/100, tx_count:r.txs }));
+
+    const allStats = (leaders||[]);
+    const uniqueWallets = new Set(allStats.map(r=>r.pay_to));
+    const totalUsdc = Object.values(walletMap).reduce((s,r)=>s+r.usdc,0);
+    const totalTxs = Object.values(walletMap).reduce((s,r)=>s+r.txs,0);
+    result.ecosystem_stats = {
+      total_usdc_volume: Math.round(totalUsdc*100)/100,
+      total_transactions: totalTxs,
+      active_services: uniqueWallets.size,
+      avg_per_service: uniqueWallets.size ? Math.round(totalUsdc/uniqueWallets.size*100)/100 : 0
+    };
+  } catch(e) { result.leaderboard = { error: e.message }; result.ecosystem_stats = {}; }
+
+  result.generated_at = new Date().toISOString();
   cache.set('market', result);
   res.json(result);
 });

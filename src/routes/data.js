@@ -51,16 +51,35 @@ router.get('/market-data', async (req, res) => {
         rich_5plus: richServices,
         avg_endpoints: Math.round(services.reduce((s,x)=>s+(x.endpoints||[]).length,0)/services.length*10)/10
       },
-      services: services.map(s => ({
+      services: [] // filled below after wallet join
+    };
+
+    // Merge with on-chain wallet data
+    const { data: wData } = await supabase.from('x402_wallets')
+      .select('service_name,total_usdc_received,tx_count,latest_tx_date')
+      .gt('tx_count',0);
+    const ocMap = {};
+    (wData||[]).forEach(w => {
+      const k = (w.service_name||'').toLowerCase();
+      if (!ocMap[k] || (w.total_usdc_received||0) > (ocMap[k].usdc||0))
+        ocMap[k] = { usdc: Math.round((w.total_usdc_received||0)*100)/100, txs: w.tx_count||0, last: w.latest_tx_date?.substring(0,10) };
+    });
+
+    result.market.services = services.map(s => {
+      const oc = ocMap[(s.name||'').toLowerCase()] || {};
+      return {
         name: s.name,
         category: s.category || 'Other',
         endpoints: (s.endpoints||[]).length,
         networks: (s.networks||[]).join(', '),
         price_min: Math.min(...(s.endpoints||[]).map(e => parseFloat(e.pricing?.amount||0)).filter(x=>x>0)) || null,
         price_max: Math.max(...(s.endpoints||[]).map(e => parseFloat(e.pricing?.amount||0))) || null,
-        domain: s.domain || s.provider || ''
-      }))
-    };
+        domain: s.domain || s.provider || '',
+        total_usdc: oc.usdc || 0,
+        tx_count: oc.txs || 0,
+        last_active: oc.last || null
+      };
+    });
   } catch(e) { result.market = { error: e.message }; }
 
   // 2. Market-wide demand signals from on-chain activity
@@ -145,6 +164,46 @@ router.get('/market-data', async (req, res) => {
       avg_per_service: uniqueWallets.size ? Math.round(totalUsdc/uniqueWallets.size*100)/100 : 0
     };
   } catch(e) { result.leaderboard = { error: e.message }; result.ecosystem_stats = {}; }
+
+
+  // Stripe MPP marketplace data
+  try {
+    const SK = process.env.STRIPE_SECRET_KEY;
+    if (SK) {
+      const axios_mod = require('axios');
+      const [evResp, impResp] = await Promise.all([
+        axios_mod.get('https://api.stripe.com/v2/core/events?limit=100', {
+          headers:{'Authorization':'Bearer '+SK,'Stripe-Version':'2026-05-27.preview'}, timeout:10000
+        }),
+        axios_mod.get('https://api.stripe.com/v2/commerce/product_catalog/imports?limit=5', {
+          headers:{'Authorization':'Bearer '+SK,'Stripe-Version':'2026-05-27.preview'}, timeout:10000
+        })
+      ]);
+
+      const events = evResp.data.data || [];
+      const agentEvts = events.filter(e => e.type?.includes('orchestrated_commerce'));
+      const payEvts = events.filter(e => e.type?.includes('payment'));
+      const agents = {};
+      agentEvts.forEach(e => {
+        const n = e.data?.orchestrator_details?.name || 'Unknown';
+        agents[n] = (agents[n]||0)+1;
+      });
+
+      const latest = (impResp.data.data||[])[0];
+      const products_listed = latest?.status_details?.succeeded?.success_count || 0;
+
+      result.stripe_mpp = {
+        source: 'Stripe Agentic Commerce (Ocean Digital Group account)',
+        agent_interactions: agentEvts.length,
+        payment_events: payEvts.length,
+        active_agents: Object.entries(agents).map(([name,count])=>({name,interactions:count})),
+        products_listed,
+        catalog_status: latest?.status || 'unknown',
+        note: 'Shows our account activity. Stripe ecosystem-wide data not publicly available.',
+        agents_enabled: ['Microsoft Copilot','Google','Meta','Wizard AI','Rye','Test Agent']
+      };
+    }
+  } catch(e) { result.stripe_mpp = { error: e.message?.substring(0,80) }; }
 
   result.generated_at = new Date().toISOString();
   cache.set('market', result);

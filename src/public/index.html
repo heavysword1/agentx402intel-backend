@@ -717,5 +717,33 @@
   setInterval(loadData, 60000);
 </script>
 
+
+    <!-- Stripe MPP Section -->
+    <div id="mpp-section" style="margin-top:40px; padding:24px; background:#111; border-radius:8px; border:1px solid #222;">
+      <h2 style="color:#f97316; margin:0 0 20px 0; font-size:18px;">🏦 Stripe Agentic Commerce — MPP Activity</h2>
+      <div id="mpp-stats" style="color:#888">Loading...</div>
+    </div>
+
+<script>
+// Render MPP
+function renderMPP(data) {
+  const mpp = data.stripe_mpp || {};
+  const el = document.getElementById("mpp-stats");
+  if (!el) return;
+  if (mpp.error) { el.innerHTML = "<p>MPP data unavailable</p>"; return; }
+  const agents = (mpp.active_agents||[]).map(a=>`<span style="color:#f97316;margin-right:16px">🤖 ${a.name}: ${a.interactions}</span>`).join("") || "<span style=\"color:#555\">Waiting for real agents...</span>";
+  const enabled = (mpp.agents_enabled||[]).map(a=>`<span style="padding:2px 8px;background:#1a1a1a;border-radius:4px;font-size:11px;color:#aaa">${a}</span>`).join(" ");
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px">
+      <div style="text-align:center"><div style="font-size:28px;font-weight:bold;color:#fff">${mpp.agent_interactions||0}</div><div style="color:#888;font-size:12px">Agent Interactions</div></div>
+      <div style="text-align:center"><div style="font-size:28px;font-weight:bold;color:#fff">${mpp.products_listed||0}</div><div style="color:#888;font-size:12px">Products Listed</div></div>
+      <div style="text-align:center"><div style="font-size:14px;color:#22c55e;font-weight:bold">${mpp.catalog_status||"?"}</div><div style="color:#888;font-size:12px">Catalog Status</div></div>
+    </div>
+    <div style="margin-bottom:12px"><strong style="color:#888;font-size:12px">ACTIVE AGENTS:</strong><br>${agents}</div>
+    <div><strong style="color:#888;font-size:12px">ENABLED FOR DISCOVERY:</strong><br><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">${enabled}</div></div>
+    <div style="margin-top:12px;font-size:11px;color:#555">${mpp.note||""}</div>
+  `;
+}
+</script>
 </body>
 </html>
